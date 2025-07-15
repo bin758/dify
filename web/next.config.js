@@ -29,7 +29,7 @@ const remoteImageURLs = [hasSetWebPrefix ? new URL(`${process.env.NEXT_PUBLIC_WE
 const nextConfig = {
   basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
   serverExternalPackages: ['esbuild-wasm'],
-  transpilePackages: ['echarts', 'zrender'],
+  transpilePackages: ['mermaid', 'echarts', 'zrender'],
   turbopack: {
     rules: codeInspectorPlugin({
       bundler: 'turbopack',

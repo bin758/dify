@@ -682,6 +682,7 @@ x-shared-env: &shared-api-worker-env
   SANDBOX_EXPIRED_RECORDS_CLEAN_BATCH_SIZE: ${SANDBOX_EXPIRED_RECORDS_CLEAN_BATCH_SIZE:-1000}
   SANDBOX_EXPIRED_RECORDS_RETENTION_DAYS: ${SANDBOX_EXPIRED_RECORDS_RETENTION_DAYS:-30}
 
+name: dify
 services:
   # Init container to fix permissions
   init_permissions:
@@ -815,7 +816,9 @@ services:
 
   # Frontend web application.
   web:
-    image: langgenius/dify-web:1.11.4
+#    image: langgenius/dify-web:1.11.4
+#    image: langgenius/dify-web:1.6.0
+    build: ../web
     restart: always
     environment:
       CONSOLE_API_URL: ${CONSOLE_API_URL:-}
