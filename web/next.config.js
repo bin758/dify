@@ -21,6 +21,7 @@ const remoteImageURLs = [hasSetWebPrefix ? new URL(`${process.env.NEXT_PUBLIC_WE
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ['mermaid'], // 关键：让 Next.js 转译 Mermaid 的 .mjs 文件
   basePath,
   assetPrefix,
   webpack: (config, { dev, isServer }) => {
