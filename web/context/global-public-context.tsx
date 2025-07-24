@@ -24,7 +24,11 @@ const setupStatusQueryKey = ['setupStatus'] as const
 async function fetchSystemFeatures() {
   const data = await getSystemFeatures()
   const { setSystemFeatures } = useGlobalPublicStore.getState()
-  setSystemFeatures({ ...defaultSystemFeatures, ...data })
+
+  const systemFeatures = { ...defaultSystemFeatures, ...data }
+  systemFeatures.branding.enabled = true
+  setSystemFeatures(systemFeatures)
+
   return data
 }
 
