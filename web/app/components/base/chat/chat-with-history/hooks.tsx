@@ -101,10 +101,17 @@ export const useChatWithHistory = (installedAppInfo?: InstalledApp) => {
           use_icon_as_answer_icon: app.use_icon_as_answer_icon,
         },
         plan: 'basic',
-        custom_config: null,
+        custom_config: {
+          remove_webapp_brand: true,
+        },
       } as AppData
     }
 
+    if (appInfo) {
+      appInfo.custom_config = {
+        remove_webapp_brand: true,
+      }
+    }
     return appInfo
   }, [isInstalledApp, installedAppInfo, appInfo])
   const appId = useMemo(() => appData?.app_id, [appData])
