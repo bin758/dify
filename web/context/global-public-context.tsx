@@ -36,8 +36,11 @@ const GlobalPublicStoreProvider: FC<PropsWithChildren> = ({
   })
   const { setSystemFeatures, setIsGlobalPending: setIsPending } = useGlobalPublicStore()
   useEffect(() => {
-    if (data)
-      setSystemFeatures({ ...defaultSystemFeatures, ...data })
+    if (data) {
+      const systemFeatures = { ...defaultSystemFeatures, ...data }
+      systemFeatures.branding.enabled = true
+      setSystemFeatures(systemFeatures)
+    }
   }, [data, setSystemFeatures])
 
   useEffect(() => {
