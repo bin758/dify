@@ -3,19 +3,18 @@ from typing import Any, Literal
 
 from typing_extensions import deprecated
 
-from core.workflow.entities.node_entities import NodeRunResult
-from core.workflow.entities.variable_pool import VariablePool
-from core.workflow.entities.workflow_node_execution import WorkflowNodeExecutionStatus
-from core.workflow.nodes.base import BaseNode
-from core.workflow.nodes.enums import NodeType
+from core.workflow.enums import NodeExecutionType, NodeType, WorkflowNodeExecutionStatus
+from core.workflow.node_events import NodeRunResult
+from core.workflow.nodes.base.node import Node
 from core.workflow.nodes.if_else.entities import IfElseNodeData
+from core.workflow.runtime import VariablePool
 from core.workflow.utils.condition.entities import Condition
 from core.workflow.utils.condition.processor import ConditionProcessor
 
 
-class IfElseNode(BaseNode[IfElseNodeData]):
-    _node_data_cls = IfElseNodeData
-    _node_type = NodeType.IF_ELSE
+class IfElseNode(Node[IfElseNodeData]):
+    node_type = NodeType.IF_ELSE
+    execution_type = NodeExecutionType.BRANCH
 
     @classmethod
     def version(cls) -> str:
@@ -26,13 +25,13 @@ class IfElseNode(BaseNode[IfElseNodeData]):
         Run node
         :return:
         """
-        node_inputs: dict[str, list] = {"conditions": []}
+        node_inputs: dict[str, Sequence[Mapping[str, Any]]] = {"conditions": []}
 
         process_data: dict[str, list] = {"condition_results": []}
 
-        input_conditions = []
+        input_conditions: Sequence[Mapping[str, Any]] = []
         final_result = False
-        selected_case_id = None
+        selected_case_id = "false"
         condition_processor = ConditionProcessor()
         try:
             # Check if the new cases structure is used
@@ -60,7 +59,7 @@ class IfElseNode(BaseNode[IfElseNodeData]):
             else:
                 # TODO: Update database then remove this
                 # Fallback to old structure if cases are not defined
-                input_conditions, group_result, final_result = _should_not_use_old_function(
+                input_conditions, group_result, final_result = _should_not_use_old_function(  # pyright: ignore [reportDeprecated]
                     condition_processor=condition_processor,
                     variable_pool=self.graph_runtime_state.variable_pool,
                     conditions=self.node_data.conditions or [],
@@ -98,12 +97,15 @@ class IfElseNode(BaseNode[IfElseNodeData]):
         *,
         graph_config: Mapping[str, Any],
         node_id: str,
-        node_data: IfElseNodeData,
+        node_data: Mapping[str, Any],
     ) -> Mapping[str, Sequence[str]]:
+        # Create typed NodeData from dict
+        typed_node_data = IfElseNodeData.model_validate(node_data)
+
         var_mapping: dict[str, list[str]] = {}
-        for case in node_data.cases or []:
+        for case in typed_node_data.cases or []:
             for condition in case.conditions:
-                key = "{}.#{}#".format(node_id, ".".join(condition.variable_selector))
+                key = f"{node_id}.#{'.'.join(condition.variable_selector)}#"
                 var_mapping[key] = condition.variable_selector
 
         return var_mapping

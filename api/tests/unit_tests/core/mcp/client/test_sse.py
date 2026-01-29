@@ -1,3 +1,4 @@
+import contextlib
 import json
 import queue
 import threading
@@ -124,13 +125,10 @@ def test_sse_client_connection_validation():
             mock_event_source.iter_sse.return_value = [endpoint_event]
 
             # Test connection
-            try:
+            with contextlib.suppress(Exception):
                 with sse_client(test_url) as (read_queue, write_queue):
                     assert read_queue is not None
                     assert write_queue is not None
-            except Exception as e:
-                # Connection might fail due to mocking, but we're testing the validation logic
-                pass
 
 
 def test_sse_client_error_handling():
@@ -141,7 +139,9 @@ def test_sse_client_error_handling():
     with patch("core.mcp.client.sse_client.create_ssrf_proxy_mcp_http_client") as mock_client_factory:
         with patch("core.mcp.client.sse_client.ssrf_proxy_sse_connect") as mock_sse_connect:
             # Mock 401 HTTP error
-            mock_error = httpx.HTTPStatusError("Unauthorized", request=Mock(), response=Mock(status_code=401))
+            mock_response = Mock(status_code=401)
+            mock_response.headers = {"WWW-Authenticate": 'Bearer realm="example"'}
+            mock_error = httpx.HTTPStatusError("Unauthorized", request=Mock(), response=mock_response)
             mock_sse_connect.side_effect = mock_error
 
             with pytest.raises(MCPAuthError):
@@ -152,7 +152,9 @@ def test_sse_client_error_handling():
     with patch("core.mcp.client.sse_client.create_ssrf_proxy_mcp_http_client") as mock_client_factory:
         with patch("core.mcp.client.sse_client.ssrf_proxy_sse_connect") as mock_sse_connect:
             # Mock other HTTP error
-            mock_error = httpx.HTTPStatusError("Server Error", request=Mock(), response=Mock(status_code=500))
+            mock_response = Mock(status_code=500)
+            mock_response.headers = {}
+            mock_error = httpx.HTTPStatusError("Server Error", request=Mock(), response=mock_response)
             mock_sse_connect.side_effect = mock_error
 
             with pytest.raises(MCPConnectionError):
@@ -178,7 +180,7 @@ def test_sse_client_timeout_configuration():
             mock_event_source.iter_sse.return_value = []
             mock_sse_connect.return_value.__enter__.return_value = mock_event_source
 
-            try:
+            with contextlib.suppress(Exception):
                 with sse_client(
                     test_url, headers=custom_headers, timeout=custom_timeout, sse_read_timeout=custom_sse_timeout
                 ) as (read_queue, write_queue):
@@ -190,9 +192,6 @@ def test_sse_client_timeout_configuration():
                     assert call_args is not None
                     timeout_arg = call_args[1]["timeout"]
                     assert timeout_arg.read == custom_sse_timeout
-            except Exception:
-                # Connection might fail due to mocking, but we tested the configuration
-                pass
 
 
 def test_sse_transport_endpoint_validation():
@@ -251,35 +250,13 @@ def test_sse_client_queue_cleanup():
             # Mock connection that raises an exception
             mock_sse_connect.side_effect = Exception("Connection failed")
 
-            try:
+            with contextlib.suppress(Exception):
                 with sse_client(test_url) as (rq, wq):
                     read_queue = rq
                     write_queue = wq
-            except Exception:
-                pass  # Expected to fail
 
             # Queues should be cleaned up even on exception
             # Note: In real implementation, cleanup should put None to signal shutdown
-
-
-def test_sse_client_url_processing():
-    """Test SSE client URL processing functions."""
-    from core.mcp.client.sse_client import remove_request_params
-
-    # Test URL with parameters
-    url_with_params = "http://example.com/sse?param1=value1&param2=value2"
-    cleaned_url = remove_request_params(url_with_params)
-    assert cleaned_url == "http://example.com/sse"
-
-    # Test URL without parameters
-    url_without_params = "http://example.com/sse"
-    cleaned_url = remove_request_params(url_without_params)
-    assert cleaned_url == "http://example.com/sse"
-
-    # Test URL with path and parameters
-    complex_url = "http://example.com/path/to/sse?session=123&token=abc"
-    cleaned_url = remove_request_params(complex_url)
-    assert cleaned_url == "http://example.com/path/to/sse"
 
 
 def test_sse_client_headers_propagation():
@@ -303,11 +280,9 @@ def test_sse_client_headers_propagation():
             mock_event_source.iter_sse.return_value = []
             mock_sse_connect.return_value.__enter__.return_value = mock_event_source
 
-            try:
+            with contextlib.suppress(Exception):
                 with sse_client(test_url, headers=custom_headers):
                     pass
-            except Exception:
-                pass  # Expected due to mocking
 
             # Verify headers were passed to client factory
             mock_client_factory.assert_called_with(headers=custom_headers)

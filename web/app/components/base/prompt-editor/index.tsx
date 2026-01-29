@@ -1,23 +1,39 @@
 'use client'
 
-import type { FC } from 'react'
-import { useEffect } from 'react'
 import type {
   EditorState,
 } from 'lexical'
+import type { FC } from 'react'
+import type {
+  ContextBlockType,
+  CurrentBlockType,
+  ErrorMessageBlockType,
+  ExternalToolBlockType,
+  HistoryBlockType,
+  LastRunBlockType,
+  QueryBlockType,
+  VariableBlockType,
+  WorkflowVariableBlockType,
+} from './types'
+import { CodeNode } from '@lexical/code'
+import { LexicalComposer } from '@lexical/react/LexicalComposer'
+import { ContentEditable } from '@lexical/react/LexicalContentEditable'
+import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
+import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
+import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
+import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import {
   $getRoot,
   TextNode,
 } from 'lexical'
-import { CodeNode } from '@lexical/code'
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
-import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
-import { ContentEditable } from '@lexical/react/LexicalContentEditable'
-import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
-import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
-import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
-// import TreeView from './plugins/tree-view'
-import Placeholder from './plugins/placeholder'
+import * as React from 'react'
+import { useEffect } from 'react'
+import { useEventEmitterContextContext } from '@/context/event-emitter'
+import { cn } from '@/utils/classnames'
+import {
+  UPDATE_DATASETS_EVENT_EMITTER,
+  UPDATE_HISTORY_EVENT_EMITTER,
+} from './constants'
 import ComponentPickerBlock from './plugins/component-picker-block'
 import {
   ContextBlock,
@@ -25,48 +41,52 @@ import {
   ContextBlockReplacementBlock,
 } from './plugins/context-block'
 import {
-  QueryBlock,
-  QueryBlockNode,
-  QueryBlockReplacementBlock,
-} from './plugins/query-block'
+  CurrentBlock,
+  CurrentBlockNode,
+  CurrentBlockReplacementBlock,
+} from './plugins/current-block'
+import { CustomTextNode } from './plugins/custom-text/node'
+import {
+  ErrorMessageBlock,
+  ErrorMessageBlockNode,
+  ErrorMessageBlockReplacementBlock,
+} from './plugins/error-message-block'
+
 import {
   HistoryBlock,
   HistoryBlockNode,
   HistoryBlockReplacementBlock,
 } from './plugins/history-block'
 import {
+  LastRunBlock,
+  LastRunBlockNode,
+  LastRunReplacementBlock,
+} from './plugins/last-run-block'
+import OnBlurBlock from './plugins/on-blur-or-focus-block'
+// import TreeView from './plugins/tree-view'
+import Placeholder from './plugins/placeholder'
+import {
+  QueryBlock,
+  QueryBlockNode,
+  QueryBlockReplacementBlock,
+} from './plugins/query-block'
+import UpdateBlock from './plugins/update-block'
+import VariableBlock from './plugins/variable-block'
+import VariableValueBlock from './plugins/variable-value-block'
+import { VariableValueBlockNode } from './plugins/variable-value-block/node'
+import {
   WorkflowVariableBlock,
   WorkflowVariableBlockNode,
   WorkflowVariableBlockReplacementBlock,
 } from './plugins/workflow-variable-block'
-import VariableBlock from './plugins/variable-block'
-import VariableValueBlock from './plugins/variable-value-block'
-import { VariableValueBlockNode } from './plugins/variable-value-block/node'
-import { CustomTextNode } from './plugins/custom-text/node'
-import OnBlurBlock from './plugins/on-blur-or-focus-block'
-import UpdateBlock from './plugins/update-block'
 import { textToEditorState } from './utils'
-import type {
-  ContextBlockType,
-  ExternalToolBlockType,
-  HistoryBlockType,
-  QueryBlockType,
-  VariableBlockType,
-  WorkflowVariableBlockType,
-} from './types'
-import {
-  UPDATE_DATASETS_EVENT_EMITTER,
-  UPDATE_HISTORY_EVENT_EMITTER,
-} from './constants'
-import { useEventEmitterContextContext } from '@/context/event-emitter'
-import cn from '@/utils/classnames'
 
 export type PromptEditorProps = {
   instanceId?: string
   compact?: boolean
   wrapperClassName?: string
   className?: string
-  placeholder?: string | JSX.Element
+  placeholder?: string | React.ReactNode
   placeholderClassName?: string
   style?: React.CSSProperties
   value?: string
@@ -80,6 +100,9 @@ export type PromptEditorProps = {
   variableBlock?: VariableBlockType
   externalToolBlock?: ExternalToolBlockType
   workflowVariableBlock?: WorkflowVariableBlockType
+  currentBlock?: CurrentBlockType
+  errorMessageBlock?: ErrorMessageBlockType
+  lastRunBlock?: LastRunBlockType
   isSupportFileVar?: boolean
 }
 
@@ -102,6 +125,9 @@ const PromptEditor: FC<PromptEditorProps> = ({
   variableBlock,
   externalToolBlock,
   workflowVariableBlock,
+  currentBlock,
+  errorMessageBlock,
+  lastRunBlock,
   isSupportFileVar,
 }) => {
   const { eventEmitter } = useEventEmitterContextContext()
@@ -119,6 +145,9 @@ const PromptEditor: FC<PromptEditorProps> = ({
       QueryBlockNode,
       WorkflowVariableBlockNode,
       VariableValueBlockNode,
+      CurrentBlockNode,
+      ErrorMessageBlockNode,
+      LastRunBlockNode, // LastRunBlockNode is used for error message block replacement
     ],
     editorState: textToEditorState(value || ''),
     onError: (error: Error) => {
@@ -151,7 +180,7 @@ const PromptEditor: FC<PromptEditorProps> = ({
     <LexicalComposer initialConfig={{ ...initialConfig, editable }}>
       <div className={cn('relative', wrapperClassName)}>
         <RichTextPlugin
-          contentEditable={
+          contentEditable={(
             <ContentEditable
               className={cn(
                 'text-text-secondary outline-none',
@@ -160,34 +189,40 @@ const PromptEditor: FC<PromptEditorProps> = ({
               )}
               style={style || {}}
             />
-          }
-          placeholder={
+          )}
+          placeholder={(
             <Placeholder
               value={placeholder}
               className={cn('truncate', placeholderClassName)}
               compact={compact}
             />
-          }
+          )}
           ErrorBoundary={LexicalErrorBoundary}
         />
         <ComponentPickerBlock
-          triggerString='/'
+          triggerString="/"
           contextBlock={contextBlock}
           historyBlock={historyBlock}
           queryBlock={queryBlock}
           variableBlock={variableBlock}
           externalToolBlock={externalToolBlock}
           workflowVariableBlock={workflowVariableBlock}
+          currentBlock={currentBlock}
+          errorMessageBlock={errorMessageBlock}
+          lastRunBlock={lastRunBlock}
           isSupportFileVar={isSupportFileVar}
         />
         <ComponentPickerBlock
-          triggerString='{'
+          triggerString="{"
           contextBlock={contextBlock}
           historyBlock={historyBlock}
           queryBlock={queryBlock}
           variableBlock={variableBlock}
           externalToolBlock={externalToolBlock}
           workflowVariableBlock={workflowVariableBlock}
+          currentBlock={currentBlock}
+          errorMessageBlock={errorMessageBlock}
+          lastRunBlock={lastRunBlock}
           isSupportFileVar={isSupportFileVar}
         />
         {
@@ -228,6 +263,35 @@ const PromptEditor: FC<PromptEditorProps> = ({
               <WorkflowVariableBlock {...workflowVariableBlock} />
               <WorkflowVariableBlockReplacementBlock {...workflowVariableBlock} />
             </>
+          )
+        }
+        {
+          currentBlock?.show && (
+            <>
+              <CurrentBlock {...currentBlock} />
+              <CurrentBlockReplacementBlock {...currentBlock} />
+            </>
+          )
+        }
+        {
+          errorMessageBlock?.show && (
+            <>
+              <ErrorMessageBlock {...errorMessageBlock} />
+              <ErrorMessageBlockReplacementBlock {...errorMessageBlock} />
+            </>
+          )
+        }
+        {
+          lastRunBlock?.show && (
+            <>
+              <LastRunBlock {...lastRunBlock} />
+              <LastRunReplacementBlock {...lastRunBlock} />
+            </>
+          )
+        }
+        {
+          isSupportFileVar && (
+            <VariableValueBlock />
           )
         }
         <OnChangePlugin onChange={handleEditorChange} />

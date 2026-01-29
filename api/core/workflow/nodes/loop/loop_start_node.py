@@ -1,17 +1,15 @@
-from core.workflow.entities.node_entities import NodeRunResult
-from core.workflow.entities.workflow_node_execution import WorkflowNodeExecutionStatus
-from core.workflow.nodes.base import BaseNode
-from core.workflow.nodes.enums import NodeType
+from core.workflow.enums import NodeType, WorkflowNodeExecutionStatus
+from core.workflow.node_events import NodeRunResult
+from core.workflow.nodes.base.node import Node
 from core.workflow.nodes.loop.entities import LoopStartNodeData
 
 
-class LoopStartNode(BaseNode[LoopStartNodeData]):
+class LoopStartNode(Node[LoopStartNodeData]):
     """
     Loop Start Node.
     """
 
-    _node_data_cls = LoopStartNodeData
-    _node_type = NodeType.LOOP_START
+    node_type = NodeType.LOOP_START
 
     @classmethod
     def version(cls) -> str:
